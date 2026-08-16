@@ -1,0 +1,836 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MedGraph — Eastern Mediterranean dependency cascade</title>
+<style>
+  :root{
+    --bg:#FAFAFA;--panel:#FFFFFF;--panel2:#F1F5F9;--line:#E2E8F0;--line2:#CBD5E1;
+    --tx:#1E293B;--mut:#475569;--dim:#94A3B8;
+    --measured:#1E293B;--assigned:#94A3B8;--unmeasured:#CBD5E1;--accent:#B45309;
+    --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+    --serif:Georgia,"Source Serif 4","Times New Roman",serif;
+    --sans:system-ui,-apple-system,"Segoe UI",Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.55 var(--serif)}
+  header{padding:26px 30px 20px;border-bottom:1px solid var(--line2)}
+  h1{margin:0;font-family:var(--sans);font-size:15px;letter-spacing:.22em;
+     font-weight:600;text-transform:uppercase}
+  .sub{color:var(--mut);font-size:15px;margin-top:6px;max-width:62ch}
+  .warn{margin-top:16px;padding:0 0 0 14px;border-left:2px solid var(--accent);
+        color:var(--mut);font-size:14px;max-width:78ch}
+  .warn b{color:var(--tx);font-weight:600}
+
+  .brief{display:grid;grid-template-columns:repeat(3,1fr);
+         border-bottom:1px solid var(--line2)}
+  @media(max-width:900px){.brief{grid-template-columns:1fr}}
+  .brief section{padding:20px 30px;border-right:1px solid var(--line)}
+  .brief section:last-child{border-right:none}
+  .brief h3{margin:0 0 9px;font-family:var(--sans);font-size:10.5px;letter-spacing:.16em;
+            color:var(--dim);font-weight:600;text-transform:uppercase}
+  .brief p{margin:0 0 9px;font-size:14px;color:var(--mut)}
+  .brief p:last-child{margin-bottom:0}
+  .brief b{color:var(--tx);font-weight:600}
+  .brief ol{margin:0;padding-left:17px;font-size:14px;color:var(--mut)}
+  .brief li{margin-bottom:5px}
+  .brief li:last-child{margin-bottom:0}
+  .brief code{font-family:var(--mono);font-size:12px;color:var(--tx);
+              background:var(--panel2);padding:1px 4px}
+
+  .prov{display:flex;align-items:stretch;border-bottom:1px solid var(--line2);
+        font-family:var(--sans);font-size:11px;background:var(--panel)}
+  .prov div.c{padding:12px 22px;border-right:1px solid var(--line);
+              letter-spacing:.12em;text-transform:uppercase;color:var(--dim)}
+  .prov .n{font-family:var(--mono);font-size:17px;font-weight:600;margin-right:9px;
+           letter-spacing:0;color:var(--tx)}
+  .u .n{color:var(--accent)}
+  .mo{margin-left:auto;display:flex;align-items:center;gap:10px;padding:0 22px;
+      border-left:1px solid var(--line);cursor:pointer;color:var(--dim);
+      letter-spacing:.12em;text-transform:uppercase;font-size:11px}
+  .mo:hover{color:var(--tx)}
+  .mo.on{color:var(--tx);background:var(--panel2)}
+  .sw{width:28px;height:14px;background:var(--line2);position:relative;transition:.15s}
+  .sw::after{content:'';position:absolute;top:2px;left:2px;width:10px;height:10px;
+             background:var(--panel);transition:.15s}
+  .mo.on .sw{background:var(--tx)}
+  .mo.on .sw::after{left:16px;background:var(--panel)}
+
+  main{display:grid;grid-template-columns:210px 1fr 340px;min-height:560px}
+  @media(max-width:1150px){main{grid-template-columns:1fr}}
+  aside,section{padding:20px 24px}
+  aside{border-right:1px solid var(--line)}
+  aside.right{border-right:none;border-left:1px solid var(--line)}
+  h2{font-size:10.5px;letter-spacing:.16em;color:var(--dim);margin:0 0 12px;
+     font-family:var(--sans);font-weight:600;text-transform:uppercase}
+  h2:not(:first-child){margin-top:28px}
+  h2 span{color:var(--mut);letter-spacing:0;text-transform:none;font-weight:400;
+          font-family:var(--serif)}
+
+  .orig{display:block;width:100%;text-align:left;background:transparent;color:var(--mut);
+        border:0;border-left:2px solid var(--line2);padding:6px 0 6px 11px;margin-bottom:9px;
+        cursor:pointer;font-size:14px;font-family:var(--serif)}
+  .orig:hover{border-left-color:var(--dim);color:var(--tx)}
+  .orig.on{border-left-color:var(--tx);color:var(--tx);font-weight:600}
+  .orig small{display:block;color:var(--dim);font-size:12px;font-weight:400;margin-top:1px}
+  label.p{display:block;color:var(--dim);font-size:10.5px;margin:14px 0 5px;
+          font-family:var(--sans);letter-spacing:.1em;text-transform:uppercase}
+  select{width:100%;background:var(--panel);color:var(--tx);border:1px solid var(--line2);
+         padding:6px;font-family:var(--mono);font-size:12px}
+  input[type=range]{width:100%;height:18px;accent-color:var(--tx)}
+  .key{margin-top:26px;font-family:var(--sans);font-size:11px;color:var(--dim)}
+  .key div{display:flex;align-items:center;gap:9px;margin-bottom:6px;white-space:nowrap}
+  .key i{flex:none;width:18px;height:0}
+  .key b{flex:none;width:18px;text-align:center;font-weight:400;font-size:13px;line-height:1}
+
+  .mapwrap{background:var(--panel);border:1px solid var(--line2);
+           padding:6px;margin-bottom:22px;position:relative}
+  svg{display:block;width:100%;height:auto}
+  .maplab{position:absolute;bottom:9px;right:13px;font-family:var(--sans);
+          font-size:10px;color:var(--dim)}
+  .nd{cursor:pointer}
+  .nd:hover circle{stroke:var(--accent)}
+  text{font-family:var(--sans);pointer-events:none}
+
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  th{text-align:left;font-family:var(--sans);font-size:10px;letter-spacing:.13em;
+     color:var(--dim);font-weight:600;padding:0 10px 8px;text-transform:uppercase;
+     border-bottom:1px solid var(--tx)}
+  th.r,td.r{text-align:right}
+  td{padding:9px 10px;border-bottom:1px solid var(--line)}
+  tr.row{cursor:pointer}
+  tr.row:hover td{background:var(--panel2)}
+  tr.row.sel td{background:var(--panel2);box-shadow:inset 2px 0 0 var(--tx)}
+  .node{font-weight:600}
+  .kind{color:var(--dim);font-size:12.5px}
+  .ord{font-family:var(--mono);color:var(--mut);font-size:12px}
+  .val{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:13px}
+  .barwrap{width:96px;background:var(--line)}
+  .bar{height:3px;background:var(--tx);min-width:2px}
+  .mv{font-family:var(--mono);font-size:11.5px}
+  .up,.down{color:var(--tx)}.same{color:var(--dim)}
+
+  .trace{margin-top:22px;border-top:1px solid var(--tx);padding-top:14px;display:none}
+  .trace.on{display:block}
+  .trace h3{margin:0 0 3px;font-size:15px;font-weight:600}
+  .trace .lead{color:var(--mut);font-size:13.5px;margin-bottom:12px;max-width:70ch}
+  .pth{font-family:var(--mono);font-size:12px;padding:9px 0;
+       border-top:1px solid var(--line)}
+  .pth .chain{color:var(--tx);margin-bottom:4px}
+  .pth .arith{color:var(--dim);font-size:11px}
+  .pth .arith b{color:var(--mut);font-weight:400}
+  .tot{font-family:var(--sans);font-size:12px;color:var(--mut);
+       border-top:1px solid var(--line2);margin-top:11px;padding-top:9px}
+  .bdg{display:inline-block;font-family:var(--sans);font-size:8.5px;letter-spacing:.1em;
+       margin-left:5px;color:var(--dim)}
+  .b-E{color:var(--tx);font-weight:600}
+  .b-A{color:var(--dim)}
+
+  .as{border-top:1px solid var(--line);padding:13px 0}
+  .as:first-child{border-top:1px solid var(--tx)}
+  .as.live{background:var(--panel2);padding-left:11px;margin-left:-11px;
+           padding-right:11px;margin-right:-11px}
+  .as .top{display:flex;align-items:baseline;gap:9px;margin-bottom:5px}
+  .aid{font-family:var(--mono);font-size:12.5px;font-weight:600}
+  .chip{font-family:var(--sans);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;
+        color:var(--dim)}
+  .c-low{color:var(--accent);font-weight:600}
+  .disp{margin-left:auto;font-family:var(--sans);font-size:10.5px;color:var(--dim);
+        letter-spacing:.05em}
+  .disp.hot{color:var(--tx);font-weight:600}
+  .as p{margin:0 0 8px;font-size:13.5px;color:var(--mut)}
+  .fals{font-size:12.5px;color:var(--dim);margin-top:7px;padding-left:11px;
+        border-left:1px solid var(--line2)}
+  .fals b{color:var(--mut);font-weight:600}
+  .wt{display:flex;align-items:center;gap:10px;font-family:var(--mono);font-size:11px;
+      color:var(--dim)}
+  .wt input{flex:1}
+  button.reset{width:100%;background:transparent;color:var(--mut);
+        border:1px solid var(--line2);padding:8px;cursor:pointer;margin-top:14px;
+        font-family:var(--sans);font-size:11px;letter-spacing:.08em;text-transform:uppercase}
+  button.reset:hover{border-color:var(--tx);color:var(--tx)}
+
+  .bottom{border-top:1px solid var(--line2);display:grid;grid-template-columns:1.5fr 1fr;
+          background:var(--panel)}
+  @media(max-width:1150px){.bottom{grid-template-columns:1fr}}
+  .bottom section:first-child{border-right:1px solid var(--line)}
+  .gap{border-left:2px solid var(--accent);padding:1px 0 1px 13px;margin-bottom:16px}
+  .gap b{display:block;font-size:14px;margin-bottom:3px}
+  .gap p{margin:0;font-size:13.5px;color:var(--mut)}
+  .gap .src{font-size:12px;color:var(--dim);margin-top:4px;font-family:var(--sans)}
+  .srcline{font-size:13px;color:var(--mut);padding-bottom:11px;margin-bottom:11px;
+           border-bottom:1px solid var(--line);max-width:60ch}
+  .srcline b{color:var(--tx);font-weight:600}
+  footer{padding:18px 30px;border-top:1px solid var(--line2);color:var(--dim);
+         font-size:12px;font-family:var(--sans);line-height:1.7}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>MEDGRAPH</h1>
+  <div class="sub">Eastern Mediterranean, Red Sea and South Caucasus dependency cascade</div>
+  <div class="warn"><b>This is not a forecast.</b> It makes a set of stated assumptions computable so their
+  consequences can be traced and tested. The output that matters is not a score, it is a ranking plus the
+  assumption that would have to change to reorder it.</div>
+</header>
+
+<div class="brief">
+  <section>
+    <h3>What this is</h3>
+    <p>A directed graph of who depends on whom across the Eastern Mediterranean,
+    Red Sea and South Caucasus. States, alliances, ports, gas fields and
+    chokepoints, connected by dependencies rather than by geography.</p>
+    <p>Every connection carries a weight and a provenance. Some are
+    <b>measured</b> from trade and shipping data with a cited source. The rest
+    are <b>analyst judgements</b>, because alliance strength and political
+    friction cannot be measured, and each is declared with a falsifier attached
+    rather than buried inside a number.</p>
+  </section>
+
+  <section>
+    <h3>What it does</h3>
+    <p>Choose somewhere a disruption starts. The model pushes it outward along
+    the dependency edges, weakening at each step, and reports who is reached, in
+    what order, and by how much.</p>
+    <p>Then it does the part that matters. It takes each stated assumption,
+    pushes it to its plausible bounds in both directions and re-runs. An
+    assumption that changes nothing can be held loosely. One that reorders the
+    table is <b>where the analysis actually rests</b>, and the tool tells you
+    which is which.</p>
+  </section>
+
+  <section>
+    <h3>How to use it</h3>
+    <ol>
+      <li>Pick a <b>shock origin</b> on the left.</li>
+      <li>Read the <b>cascade</b> under the map. Order is how many steps away a
+      node sits.</li>
+      <li><b>Click any node</b>, on the map or in the table, for every route the
+      shock took to reach it and the arithmetic behind its number.</li>
+      <li><b>Drag an assumption</b> on the right and watch the ranking reorder.
+      Arrows show how far each node moved.</li>
+      <li>Toggle <code>MEASURED EVIDENCE ONLY</code> to silence every judgement
+      and see what the evidence alone carries.</li>
+    </ol>
+  </section>
+</div>
+
+<div class="prov">
+  <div class="c m"><span class="n" id="pv-m">0</span>MEASURED</div>
+  <div class="c a"><span class="n" id="pv-a">0</span>ANALYST ASSIGNED</div>
+  <div class="c u"><span class="n" id="pv-u">0</span>NOT YET MEASURED</div>
+  <div class="c" style="color:var(--dim)"><span class="n" id="pv-n" style="color:var(--tx)">0</span>NODES</div>
+  <div class="mo" id="mo"><div class="sw"></div>MEASURED EVIDENCE ONLY</div>
+</div>
+
+<main>
+  <aside>
+    <h2>Shock origin</h2>
+    <div id="origins"></div>
+    <h2>Propagation</h2>
+    <label class="p">Damping f(n)</label>
+    <select id="at">
+      <option value="exponential">exponential  k^n</option>
+      <option value="linear">linear  1-(1-k)n</option>
+      <option value="none">none  1</option>
+    </select>
+    <label class="p">Decay k = <span id="lab-k">0.85</span></label>
+    <input type="range" id="k" min="0.5" max="1" step="0.05" value="0.85">
+    <div class="key">
+      <div><i style="border-top:2.5px solid var(--measured)"></i>measured</div>
+      <div><i style="border-top:1.2px solid var(--assigned)"></i>analyst assigned</div>
+      <div><i style="border-top:1px dotted var(--line2)"></i>not yet measured</div>
+      <div><i style="border-top:2.5px solid var(--accent)"></i>traced path</div>
+      <div><b style="color:var(--tx)">&#9679;</b>impacted</div>
+      <div><b style="color:var(--dim)">&#9675;</b>untouched</div>
+    </div>
+  </aside>
+
+  <section>
+    <div class="mapwrap">
+      <svg id="map" viewBox="0 0 820 470"></svg>
+      <div class="maplab">equirectangular, not area-true · edges are dependencies, not routes · overlapping nodes separated, mean shift 3.6px</div>
+    </div>
+
+    <h2>Cascade <span id="ctitle"></span></h2>
+    <table>
+      <thead><tr><th>Node</th><th>Type</th><th>Order</th><th class="r">Impact</th><th></th><th class="r">Δ</th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+    <div id="empty" style="color:var(--dim);font-size:12.5px;padding:14px 8px;display:none"></div>
+
+    <div class="trace" id="trace"></div>
+  </section>
+
+  <aside class="right">
+    <h2>Assumptions <span>— drag to test</span></h2>
+    <div id="assumps"></div>
+    <button class="reset" id="reset">Reset all to stated values</button>
+  </aside>
+</main>
+
+<div class="bottom">
+  <section>
+    <h2>Intelligence gaps</h2>
+    <div style="color:var(--mut);font-size:12px;margin-bottom:12px">
+      Questions the open record does not answer. Recorded rather than filled with inference.
+    </div>
+    <div id="gaps"></div>
+  </section>
+  <section>
+    <h2>Provenance</h2>
+    <div id="srcs"></div>
+  </section>
+</div>
+
+<footer>
+  Ethan Gallant · <span id="ec">0</span> edges over <span id="nc">0</span> nodes ·
+  Parallel edges collapsed by maximum weight · Dependency edges reversed on load, control edges not ·
+  Impact = initial × Π(edge weights) × f(hops) ·
+  United States plotted at Naples and NATO at Brussels, for layout only<br>Built 2026-08-16 from data/geopol_risk.db (4 measured, 20 assigned, 5 not yet measured)
+</footer>
+
+<script>
+const DATA = {"actors":[{"id":"TUR","name":"Turkey","kind":"state","notes":"Montreux custodian. Contests Greek EEZ and airspace.","lat":39.93,"lon":32.86},{"id":"GRC","name":"Greece","kind":"state","notes":"UNCLOS EEZ claimant. 2021 defence pact with France.","lat":37.98,"lon":23.73},{"id":"CYP","name":"Cyprus","kind":"state","notes":"Aphrodite licensor. Not a NATO member.","lat":35.19,"lon":33.38},{"id":"EGY","name":"Egypt","kind":"state","notes":"Official budget widely held to understate actual spend. Treat as a floor. Suez transit revenue and LNG re-export both exposed.","lat":30.04,"lon":31.24},{"id":"ISR","name":"Israel","kind":"state","notes":"Leviathan and Tamar operator. Great Sea Interconnector partner.","lat":31.78,"lon":35.22},{"id":"FRA","name":"France","kind":"state","notes":"2021 mutual defence clause with Greece. Standing naval presence.","lat":48.86,"lon":2.35},{"id":"USA","name":"United States","kind":"state","notes":"Sixth Fleet. De-escalation objective on the southern flank.","lat":40.85,"lon":14.27,"plotnote":"Naples, US Sixth Fleet"},{"id":"IRN","name":"Iran","kind":"state","notes":"Budget figure contested. Proxy network is the main instrument.","lat":35.69,"lon":51.39},{"id":"AZE","name":"Azerbaijan","kind":"state","notes":"Zangezur corridor claimant. SGC gas supplier to Europe.","lat":40.41,"lon":49.87},{"id":"ARM","name":"Armenia","kind":"state","notes":"Syunik province is the contested land bridge.","lat":40.18,"lon":44.51},{"id":"NATO","name":"NATO","kind":"alliance","notes":"Modelled as an actor to carry Article 5 signalling, not as a budget holder.","lat":50.85,"lon":4.35,"plotnote":"Brussels"},{"id":"HOUTHI","name":"Ansar Allah","kind":"non_state","notes":"Bab el-Mandeb interdiction capability. Iran-aligned, not Iran-controlled.","lat":15.37,"lon":44.19}],"infra":[{"id":"APHRODITE","name":"Aphrodite gas field","kind":"gas_field","lat":33.05,"lon":32.6,"notes":"Cyprus Block 12. Development repeatedly delayed. Export route unresolved."},{"id":"ZOHR","name":"Zohr gas field","kind":"gas_field","lat":33.8,"lon":32.3,"notes":"Underpins Egyptian domestic supply and LNG re-export capacity."},{"id":"LEVIATHAN","name":"Leviathan gas field","kind":"gas_field","lat":33.0,"lon":33.1,"notes":"Exports to Egypt and Jordan."},{"id":"TAMAR","name":"Tamar gas field","kind":"gas_field","lat":32.6,"lon":33.3,"notes":null},{"id":"BAB_MANDEB","name":"Bab el-Mandeb Strait","kind":"chokepoint","lat":12.6,"lon":43.35,"notes":"Pre-2024 throughput commonly cited near 8-9 m b/d oil. Volumes fell sharply during Red Sea interdiction. Use a dated figure, not a standing one."},{"id":"SUEZ","name":"Suez Canal","kind":"chokepoint","lat":30.5,"lon":32.35,"notes":"Transit revenue is a direct Egyptian fiscal exposure, which is the cascade channel that matters here."},{"id":"TURKISH_STRAITS","name":"Turkish Straits","kind":"chokepoint","lat":41.1,"lon":29.05,"notes":"Turkey invoked Article 19 in 2022. Legal control, not just geographic."},{"id":"HORMUZ","name":"Strait of Hormuz","kind":"chokepoint","lat":26.55,"lon":56.25,"notes":"Named in the Ankara Summit Declaration. In scope for the freedom of navigation asymmetry argument."},{"id":"GSI","name":"Great Sea Interconnector","kind":"interconnector","lat":34.5,"lon":32.9,"notes":"Greece to Cyprus to Israel electricity link. Survey operations are the Inject 1 flashpoint. Status contested and repeatedly delayed."},{"id":"PIRAEUS","name":"Port of Piraeus","kind":"port","lat":37.94,"lon":23.62,"notes":"COSCO majority holding. Carries over into the terminals study."},{"id":"PORT_SAID","name":"Port Said","kind":"port","lat":31.26,"lon":32.3,"notes":"Northern Suez approach."},{"id":"HAIFA","name":"Port of Haifa","kind":"port","lat":32.82,"lon":35.0,"notes":"Adani-Gadot acquisition 2023."},{"id":"LIMASSOL","name":"Port of Limassol","kind":"port","lat":34.65,"lon":33.02,"notes":null},{"id":"MERSIN","name":"Port of Mersin","kind":"port","lat":36.79,"lon":34.62,"notes":null},{"id":"IDKU","name":"Idku LNG","kind":"lng_terminal","lat":31.35,"lon":30.3,"notes":"One of two Egyptian liquefaction routes for Israeli and domestic gas."},{"id":"DAMIETTA","name":"Damietta LNG","kind":"lng_terminal","lat":31.45,"lon":31.75,"notes":null},{"id":"REVITHOUSSA","name":"Revithoussa LNG","kind":"lng_terminal","lat":37.95,"lon":23.4,"notes":"Greek import and regasification."}],"rel":[{"u":"GRC","v":"TUR","t":"rival","weight":0.75,"basis":"ASSIGNED","conf":"moderate","aid":"A005","source":"Analyst judgement. Continental shelf and airspace disputes, 2023 Athens Declaration."},{"u":"TUR","v":"GRC","t":"rival","weight":0.75,"basis":"ASSIGNED","conf":"moderate","aid":"A005","source":"Analyst judgement."},{"u":"GRC","v":"FRA","t":"treaty","weight":0.6,"basis":"ASSIGNED","conf":"low","aid":"A001","source":"2021 mutual defence clause. Threshold untested, hence low confidence."},{"u":"FRA","v":"GRC","t":"treaty","weight":0.6,"basis":"ASSIGNED","conf":"low","aid":"A001","source":"Reciprocal."},{"u":"GRC","v":"CYP","t":"ally","weight":0.85,"basis":"ASSIGNED","conf":"high","aid":null,"source":"Analyst judgement."},{"u":"CYP","v":"GRC","t":"ally","weight":0.85,"basis":"ASSIGNED","conf":"high","aid":null,"source":"Analyst judgement."},{"u":"ISR","v":"EGY","t":"energy_dependent","weight":0.0,"basis":"EMPIRICAL","conf":"high","aid":null,"source":"PLACEHOLDER. Compute from Israeli pipeline gas volumes to Egyptian liquefaction. Source: operator and ministry data."},{"u":"EGY","v":"ISR","t":"energy_dependent","weight":0.0,"basis":"EMPIRICAL","conf":"high","aid":null,"source":"PLACEHOLDER. Egyptian LNG re-export depends on Israeli feedstock."},{"u":"USA","v":"NATO","t":"ally","weight":0.9,"basis":"ASSIGNED","conf":"high","aid":"A002","source":"Analyst judgement."},{"u":"NATO","v":"TUR","t":"ally","weight":0.55,"basis":"ASSIGNED","conf":"moderate","aid":"A002","source":"Constrained by the alliance's silence on the Eastern Mediterranean."},{"u":"NATO","v":"GRC","t":"ally","weight":0.55,"basis":"ASSIGNED","conf":"moderate","aid":"A002","source":"As above."},{"u":"IRN","v":"HOUTHI","t":"proxy","weight":0.5,"basis":"ASSIGNED","conf":"moderate","aid":"A004","source":"Aligned not directed. Deliberately below the 0.8 a command relationship would imply."},{"u":"AZE","v":"TUR","t":"ally","weight":0.8,"basis":"ASSIGNED","conf":"high","aid":null,"source":"Analyst judgement."},{"u":"ARM","v":"IRN","t":"trade_dependent","weight":0.0592,"basis":"EMPIRICAL","conf":"moderate","aid":null,"source":"UN Comtrade public preview API, retrieved 2026-08-16. Armenian imports from Iran as a share of Armenian imports from world, annual, mean of 4 year(s) in [2021, 2022, 2023, 2024]."},{"u":"EGY","v":"USA","t":"ally","weight":0.45,"basis":"ASSIGNED","conf":"low","aid":"A003","source":"Swing state posture. Low confidence is the point."}],"dep":[{"u":"CYP","v":"APHRODITE","t":"operates","weight":0.9,"basis":"ASSIGNED","conf":"high","aid":null,"source":"Licensor."},{"u":"EGY","v":"ZOHR","t":"operates","weight":0.95,"basis":"ASSIGNED","conf":"high","aid":null,"source":null},{"u":"ISR","v":"LEVIATHAN","t":"operates","weight":0.95,"basis":"ASSIGNED","conf":"high","aid":null,"source":null},{"u":"ISR","v":"TAMAR","t":"operates","weight":0.95,"basis":"ASSIGNED","conf":"high","aid":null,"source":null},{"u":"LEVIATHAN","v":"IDKU","t":"supplies","weight":0.0,"basis":"EMPIRICAL","conf":"high","aid":null,"source":"PLACEHOLDER. Pipeline volumes, operator disclosures."},{"u":"ZOHR","v":"DAMIETTA","t":"supplies","weight":0.0,"basis":"EMPIRICAL","conf":"high","aid":null,"source":"PLACEHOLDER."},{"u":"EGY","v":"SUEZ","t":"operates","weight":1.0,"basis":"ASSIGNED","conf":"high","aid":"A003","source":"Sovereign control. Fiscal exposure is the cascade channel."},{"u":"TUR","v":"TURKISH_STRAITS","t":"operates","weight":1.0,"basis":"ASSIGNED","conf":"high","aid":null,"source":"Montreux custodianship, including the 2022 Article 19 invocation."},{"u":"HOUTHI","v":"BAB_MANDEB","t":"interdicts","weight":0.5648672212165513,"basis":"EMPIRICAL","conf":"moderate","aid":"A004","source":"IMF PortWatch Daily Chokepoints Data, retrieved 2026-08-16. Baseline 2023-01-01 to 2023-10-31, disruption 2024-01-01 to 2024-12-31, field n_total."},{"u":"SUEZ","v":"BAB_MANDEB","t":"physically_adjacent","weight":0.8183853301886972,"basis":"EMPIRICAL","conf":"high","aid":null,"source":"IMF PortWatch Daily Chokepoints Data, retrieved 2026-08-16. Baseline 2023-01-01 to 2023-10-31, disruption 2024-01-01 to 2024-12-31, field n_total."},{"u":"GRC","v":"REVITHOUSSA","t":"imports_via","weight":0.0,"basis":"EMPIRICAL","conf":"moderate","aid":null,"source":"PLACEHOLDER. EIA or Eurostat LNG import series."},{"u":"APHRODITE","v":"GSI","t":"physically_adjacent","weight":0.4,"basis":"ASSIGNED","conf":"low","aid":"A005","source":"Survey corridors overlap. Weight is a judgement about co-location risk."}],"assump":[{"id":"A001","statement":"France would act on the 2021 mutual defence clause in a Greece-Turkey maritime incident short of armed attack.","rationale":"The 2021 Franco-Hellenic agreement contains a mutual assistance clause, but its trigger threshold for sub-Article-5 incidents has never been tested. France has deployed naval assets during previous standoffs without invoking it.","conf":"low","falsifier":"A documented incident in which France declined to respond, or an official French statement defining the threshold, would settle this either way."},{"id":"A002","statement":"NATO cohesion constrains escalation between two member states more than it enables collective response against a third party in this theatre.","rationale":"The Ankara Summit Declaration committed the alliance to freedom of navigation in the Strait of Hormuz while making no reference to the Eastern Mediterranean, where two members contest each other's maritime boundaries. That silence is the observable evidence.","conf":"moderate","falsifier":"An alliance statement naming the Eastern Mediterranean, or a NATO-brokered de-confliction mechanism with teeth, would weaken this."},{"id":"A003","statement":"Egypt's incentive to preserve swing-state neutrality outweighs its exposure to a Suez revenue shock.","rationale":"Egypt has maintained working relations across the Israeli, Turkish and Gulf blocs. But Suez transit receipts are a first-order fiscal input and the 2024 Red Sea disruption showed how fast they fall.","conf":"low","falsifier":"The size of the revenue drop at which Cairo's posture changed in 2024, if it changed, is the test. This is currently an intelligence gap."},{"id":"A004","statement":"Ansar Allah interdiction decisions are Iran-aligned but not Iran-directed.","rationale":"Targeting choices during 2024 diverged from what a directed campaign would predict, including strikes on vessels with no Israeli linkage.","conf":"moderate","falsifier":"Evidence of pre-clearance of specific targets through Iranian channels would overturn this and would materially change the cascade path."},{"id":"A005","statement":"A survey vessel interception escalates to a naval collision only where both parties have deployed armed escort.","rationale":"The 2020 Oruc Reis standoff produced a frigate collision under escort conditions. Unescorted survey activity has not produced comparable incidents.","conf":"moderate","falsifier":"An unescorted incident producing collision would falsify this."}],"gaps":[{"subject":"Egyptian fiscal threshold","question":"At what level of Suez transit revenue loss did Cairo's diplomatic posture measurably change during the 2024 Red Sea disruption, if it did?","why":"Assumption A003 carries the Egypt cascade path. Without this the model ranks Egypt on a judgement rather than an observed threshold.","sought_in":"SCA monthly statements, IMF Article IV, Egyptian budget documents"},{"subject":"Great Sea Interconnector status","question":"What is the current contracted and financed status of the interconnector, and which survey segments remain outstanding?","why":"Inject 1 assumes live survey operations in the disputed corridor. If survey work is suspended, the scenario opens on a false premise.","sought_in":"Project company filings, Cypriot and Greek ministry statements, EU funding records"},{"subject":"Aphrodite export route","question":"Which export route is actually contracted for Aphrodite volumes?","why":"Determines whether an Aphrodite disruption propagates to Egyptian liquefaction or stops at the wellhead.","sought_in":"Operator disclosures, Cypriot hydrocarbons ministry"},{"subject":"Franco-Hellenic clause threshold","question":"What incident threshold triggers the 2021 mutual assistance clause?","why":"Assumption A001 is graded low confidence solely because of this gap.","sought_in":"Treaty text as ratified, French and Greek parliamentary records"},{"subject":"Idku liquefaction feedstock split","question":"What share of Idku LNG throughput is sourced from Leviathan rather than Egyptian domestic production?","why":"Determines whether an Israeli supply disruption propagates to Egyptian export revenue or is absorbed upstream. The LEVIATHAN to IDKU edge cannot be weighted without it.","sought_in":"Operator disclosures, EGAS and Egyptian Ministry of Petroleum statements, JODI Gas"},{"subject":"Damietta liquefaction feedstock split","question":"What share of Damietta LNG throughput is sourced from Zohr?","why":"Same problem as Idku, for the second Egyptian liquefaction route. The ZOHR to DAMIETTA edge cannot be weighted without it.","sought_in":"Eni disclosures, EGAS, Egyptian Ministry of Petroleum"},{"subject":"Israeli gas share of Egyptian liquefaction","question":"What proportion of Egyptian LNG export feedstock is Israeli pipeline gas, and what proportion of Israeli export volume goes to Egypt?","why":"Carries both energy_dependent edges between Israel and Egypt, which are the only route by which an Eastern Mediterranean gas shock reaches Cairo in the current graph.","sought_in":"Israel Ministry of Energy statistics, Egyptian Ministry of Petroleum, NewMed and Chevron operator reports, JODI Gas"},{"subject":"LNG share of Greek gas supply","question":"What share of Greek gas supply arrives as LNG through Revithoussa rather than by pipeline?","why":"The REVITHOUSSA to GRC edge is unweighted, so a Greek import disruption currently propagates nothing.","sought_in":"Eurostat energy balances, DESFA published figures"}]};
+// MedGraph browser engine. Faithful port of src/engine.py, plus path tracing.
+//
+// Kept as a separate file so the maths can be tested against the Python
+// reference before being inlined into the viewer by build_viewer.py. The
+// module export at the bottom exists for that test harness and is stripped
+// at build time; it has no meaning in a browser.
+//
+// Verified identical to engine.py across four scenarios and twenty-one values.
+
+const ATTEN = {
+  exponential: (hop, k) => Math.pow(k, hop),
+  linear:      (hop, k) => Math.max(0, 1 - (1 - k) * hop),
+  none:        () => 1,
+};
+
+// Escape anything interpolated into innerHTML. Every field currently comes
+// from seed data written by hand, so there is nothing hostile in the database
+// today. But the viewer is a public page built by string concatenation, and
+// the moment a node name or a source string arrives from an external response
+// that becomes an injection path. Cheaper to close now than to remember later.
+function esc(v) {
+  if (v == null) return '';
+  return String(v)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+const CONTROL   = new Set(['interdicts']);
+const SYMMETRIC = new Set(['physically_adjacent']);
+// Decision 7: relation types split the same way. trade_dependent and
+// energy_dependent carry dependency semantics and are reversed; ally, rival,
+// treaty, adversary and proxy are already in cascade direction.
+const REL_DEPENDENCY = new Set(['trade_dependent', 'energy_dependent']);
+
+// Decision 6: dependency rows load by family. CONTROL as stored, SYMMETRIC both
+// ways, everything else reversed, because the table records who depends on what
+// while a cascade runs the other way.
+function buildEdges(DATA, overrides, measuredOnly) {
+  overrides = overrides || {};
+  const raw = [];
+  DATA.rel.forEach(e => raw.push(REL_DEPENDENCY.has(e.t)
+    ? Object.assign({}, e, { u: e.v, v: e.u })
+    : Object.assign({}, e)));
+  DATA.dep.forEach(e => {
+    if (CONTROL.has(e.t)) {
+      raw.push(Object.assign({}, e));
+    } else if (SYMMETRIC.has(e.t)) {
+      raw.push(Object.assign({}, e));
+      raw.push(Object.assign({}, e, { u: e.v, v: e.u }));
+    } else {
+      raw.push(Object.assign({}, e, { u: e.v, v: e.u }));
+    }
+  });
+
+  // Decision 1: parallel edges collapse by maximum weight.
+  const edges = new Map();
+  raw.forEach(e => {
+    const k = e.u + '|' + e.v;
+    if (!edges.has(k)) {
+      edges.set(k, { u: e.u, v: e.v, weight: e.weight, basis: e.basis,
+                     conf: e.conf, aid: e.aid, source: e.source, types: [e.t] });
+    } else {
+      const x = edges.get(k);
+      x.types.push(e.t);
+      if (e.weight > x.weight) {
+        x.weight = e.weight; x.basis = e.basis;
+        x.conf = e.conf; x.aid = e.aid; x.source = e.source;
+      }
+    }
+  });
+
+  edges.forEach(e => {
+    if (e.basis === 'ASSIGNED' && e.aid && overrides[e.aid] != null) {
+      e.weight = Math.max(0, Math.min(1, e.weight * overrides[e.aid]));
+    }
+    // Counterfactual mode: silence every analyst judgement and see what the
+    // measured record alone can carry.
+    if (measuredOnly && e.basis !== 'EMPIRICAL') e.weight = 0;
+  });
+  return edges;
+}
+
+function successors(edges) {
+  const s = new Map();
+  edges.forEach(e => {
+    if (!s.has(e.u)) s.set(e.u, []);
+    s.get(e.u).push(e);
+  });
+  return s;
+}
+
+function simulate(edges, origin, opts) {
+  opts = opts || {};
+  const decay    = opts.decay    != null ? opts.decay    : 0.85;
+  const floor    = opts.floor    != null ? opts.floor    : 0.01;
+  const maxOrder = opts.maxOrder != null ? opts.maxOrder : 5;
+  const initial  = opts.initial  != null ? opts.initial  : 1.0;
+  const f = ATTEN[opts.atten || 'exponential'];
+  const succ = successors(edges);
+
+  const impact = new Map([[origin, initial]]);
+  const order  = new Map([[origin, 0]]);
+  let frontier = new Map([[origin, initial]]);   // raw path product, undamped
+
+  for (let hop = 1; hop <= maxOrder; hop++) {
+    const rawNext = new Map();
+    frontier.forEach((raw, u) => {
+      (succ.get(u) || []).forEach(e => {
+        if (e.v === origin) return;              // never re-enter the source
+        rawNext.set(e.v, (rawNext.get(e.v) || 0) + raw * e.weight);
+      });
+    });
+    if (rawNext.size === 0) break;
+
+    const factor = f(hop, decay);
+    const surviving = new Map();
+    rawNext.forEach((raw, v) => {
+      const delivered = raw * factor;
+      if (delivered < floor) return;             // Decision 4
+      impact.set(v, Math.min(initial, (impact.get(v) || 0) + delivered));
+      if (!order.has(v)) order.set(v, hop);
+      surviving.set(v, raw);
+    });
+    if (surviving.size === 0) break;
+    frontier = surviving;
+  }
+  return { impact, order };
+}
+
+// Enumerate the routes by which a shock reaches one node, with the arithmetic
+// for each. This is the answer to "where did that number come from", which is
+// the only question that really matters about a model like this.
+function tracePaths(edges, origin, target, opts) {
+  opts = opts || {};
+  const decay    = opts.decay    != null ? opts.decay    : 0.85;
+  const floor    = opts.floor    != null ? opts.floor    : 0.01;
+  const maxOrder = opts.maxOrder != null ? opts.maxOrder : 5;
+  const initial  = opts.initial  != null ? opts.initial  : 1.0;
+  const f = ATTEN[opts.atten || 'exponential'];
+  const succ = successors(edges);
+  const found = [];
+
+  (function walk(node, hop, raw, trail) {
+    if (hop > maxOrder) return;
+    (succ.get(node) || []).forEach(e => {
+      if (e.v === origin) return;
+      if (e.weight === 0) return;
+      const r = raw * e.weight;
+      const delivered = r * f(hop, decay);
+      if (delivered < floor) return;
+      const t = trail.concat([e]);
+      if (e.v === target) found.push({ edges: t, hops: hop, raw: r, delivered });
+      walk(e.v, hop + 1, r, t);
+    });
+  })(origin, 1, initial, []);
+
+  found.sort((a, b) => b.delivered - a.delivered);
+  return found;
+}
+
+function rank(impact, order, origin) {
+  const rows = [];
+  impact.forEach((v, n) => {
+    if (n !== origin && v > 0) rows.push({ node: n, impact: v, order: order.get(n) });
+  });
+  rows.sort((a, b) => b.impact - a.impact);
+  return rows;
+}
+
+function sensitivity(DATA, origin, opts, measuredOnly, topN, delta) {
+  topN = topN || 5;
+  delta = delta || 0.4;
+  const b = simulate(buildEdges(DATA, {}, measuredOnly), origin, opts);
+  const baseline = rank(b.impact, b.order, origin).slice(0, topN).map(r => r.node);
+  const basePos = new Map(baseline.map((n, i) => [n, i]));
+
+  const byAssumption = new Map();
+  buildEdges(DATA, {}, measuredOnly).forEach(e => {
+    if (e.basis === 'ASSIGNED' && e.aid) {
+      byAssumption.set(e.aid, (byAssumption.get(e.aid) || 0) + 1);
+    }
+  });
+
+  const out = [];
+  byAssumption.forEach((count, aid) => {
+    let worst = 0, dir = null;
+    [['down', 1 - delta], ['up', 1 + delta]].forEach(([label, factor]) => {
+      const o = {}; o[aid] = factor;
+      const r = simulate(buildEdges(DATA, o, measuredOnly), origin, opts);
+      const perturbed = rank(r.impact, r.order, origin).map(x => x.node);
+      const pos = new Map(perturbed.map((n, i) => [n, i]));
+      let disp = 0;
+      basePos.forEach((i, n) => {
+        const j = pos.has(n) ? pos.get(n) : perturbed.length;
+        disp += Math.abs(i - j);
+      });
+      if (disp > worst) { worst = disp; dir = label; }
+    });
+    out.push({ aid, edges: count, displacement: worst, direction: dir });
+  });
+  out.sort((a, b) => b.displacement - a.displacement);
+  return { results: out, baseline };
+}
+
+
+
+const ORIGINS = [
+  ['SUEZ','Suez Canal','transit disruption'],
+  ['BAB_MANDEB','Bab el-Mandeb','Red Sea interdiction'],
+  ['TURKISH_STRAITS','Turkish Straits','Montreux leverage'],
+  ['APHRODITE','Aphrodite field','survey corridor incident'],
+  ['LEVIATHAN','Leviathan field','Israeli supply shock'],
+];
+const SHORT = {};
+
+const NODES = {};
+DATA.actors.forEach(a => NODES[a.id] = a);
+DATA.infra.forEach(i => NODES[i.id] = i);
+// All display accessors escape. See esc() in the engine for why.
+const KIND = id => esc((NODES[id] || {}).kind || '');
+const NAME = id => esc((NODES[id] || {}).name || id);
+const ID = id => esc(id);
+
+let origin = 'SUEZ', overrides = {}, measuredOnly = false, selected = null;
+const opts = () => ({ decay:+document.getElementById('k').value,
+                      atten:document.getElementById('at').value });
+
+// ---- projection -----------------------------------------------------------
+const LATS = Object.values(NODES).map(n => n.lat), LONS = Object.values(NODES).map(n => n.lon);
+const LA0 = Math.min(...LATS), LA1 = Math.max(...LATS);
+const LO0 = Math.min(...LONS), LO1 = Math.max(...LONS);
+const W = 820, H = 470, PAD = 46;
+const rawx = n => PAD + (n.lon - LO0) / (LO1 - LO0) * (W - 2 * PAD);
+const rawy = n => PAD + (LA1 - n.lat) / (LA1 - LA0) * (H - 2 * PAD);
+
+// True coordinates put twenty-one node pairs within sixteen pixels of each
+// other. Piraeus sits on Athens, Limassol on Nicosia, and the whole Egyptian
+// and Israeli offshore cluster collapses into one smudge, which reads as a
+// rendering fault rather than as geography.
+//
+// This separates them with a deterministic relaxation pass: push overlapping
+// pairs apart, then pull everything gently back toward its true position each
+// iteration so the result stays recognisably a map. Settles at two overlaps
+// remaining, mean displacement 3.6px and maximum 11.6px on an 820px canvas,
+// so roughly one percent of width. No randomness, so the layout is identical
+// on every build.
+const POS = (() => {
+  const ids = Object.keys(NODES).sort();
+  const P = {};
+  ids.forEach((id, i) => {
+    const n = NODES[id];
+    P[id] = { x: rawx(n), y: rawy(n), ox: rawx(n), oy: rawy(n), i };
+  });
+  const MIN = 17, PULL = 0.04;
+  for (let it = 0; it < 300; it++) {
+    let moved = false;
+    for (let i = 0; i < ids.length; i++) {
+      for (let j = i + 1; j < ids.length; j++) {
+        const a = P[ids[i]], b = P[ids[j]];
+        let dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy);
+        if (d < 0.001) {                 // exactly coincident: nudge by index
+          const t = (a.i + 1) * 0.7;
+          dx = Math.cos(t); dy = Math.sin(t); d = 1;
+        }
+        if (d < MIN) {
+          const push = (MIN - d) / 2 * 0.6, ux = dx / d, uy = dy / d;
+          a.x -= ux * push; a.y -= uy * push;
+          b.x += ux * push; b.y += uy * push;
+          moved = true;
+        }
+      }
+    }
+    ids.forEach(id => {
+      const p = P[id];
+      p.x += (p.ox - p.x) * PULL;
+      p.y += (p.oy - p.y) * PULL;
+    });
+    if (!moved) break;
+  }
+  return P;
+})();
+
+const px = n => POS[n.id].x;
+const py = n => POS[n.id].y;
+
+// Graticule. The projection is equirectangular and therefore not area-true:
+// at this latitude a degree of longitude is about four fifths of a degree of
+// latitude, and the canvas does not correct for it. Rather than hide that, the
+// grid makes it visible. Cells are noticeably wider than they are tall, which
+// is exactly the distortion, on display.
+//
+// No coastlines, deliberately. The edges are dependencies, not routes. SUEZ to
+// EGY is a fiscal relationship, not a shipping lane, and drawing straight lines
+// over a coastline would invite a reader to think the geometry means something.
+// Positions are geographic; the lines between them are not.
+function graticule() {
+  const out = [];
+  const lonStep = 10, latStep = 10;
+  for (let lon = Math.ceil(LO0 / lonStep) * lonStep; lon <= LO1; lon += lonStep) {
+    const x = rawx({ lon, lat: 0 });
+    out.push(`<line x1="${x.toFixed(1)}" y1="26" x2="${x.toFixed(1)}" y2="${H - 22}"
+      stroke="#E2E8F0" stroke-width="0.6"/>`);
+    out.push(`<text x="${x.toFixed(1)}" y="18" text-anchor="middle" font-size="9"
+      fill="#94A3B8">${Math.abs(lon)}&#176;${lon < 0 ? 'W' : 'E'}</text>`);
+  }
+  for (let lat = Math.ceil(LA0 / latStep) * latStep; lat <= LA1; lat += latStep) {
+    const y = rawy({ lat, lon: 0 });
+    out.push(`<line x1="26" y1="${y.toFixed(1)}" x2="${W - 22}" y2="${y.toFixed(1)}"
+      stroke="#E2E8F0" stroke-width="0.6"/>`);
+    out.push(`<text x="18" y="${(y + 3).toFixed(1)}" text-anchor="end" font-size="9"
+      fill="#94A3B8">${Math.abs(lat)}&#176;${lat < 0 ? 'S' : 'N'}</text>`);
+  }
+  return out;
+}
+
+function drawMap(edges, impact, order) {
+  const parts = graticule();
+  const live = new Set();
+  if (selected) tracePaths(edges, origin, selected, opts())
+    .forEach(p => p.edges.forEach(e => live.add(e.u + '|' + e.v)));
+
+  edges.forEach(e => {
+    const a = NODES[e.u], b = NODES[e.v];
+    if (!a || !b) return;
+    // Provenance is encoded by weight and line style rather than by hue.
+    // Measured edges are dark and heavy, assigned are mid-grey and lighter,
+    // unmeasured are a light dotted hairline. That reads on paper, survives
+    // greyscale, and does not depend on colour vision.
+    const zero = e.weight === 0;
+    const meas = e.basis === 'EMPIRICAL' && !zero;
+    const col = zero ? '#CBD5E1' : (meas ? '#1E293B' : '#94A3B8');
+    const on = live.has(e.u + '|' + e.v);
+    const touched = impact.has(e.u) && !zero;
+    const op = on ? 1 : (touched ? .75 : .3);
+    const w = zero ? 0.8
+                   : (0.6 + e.weight * 2.2) * (meas ? 1.5 : 1) * (on ? 1.6 : 1);
+    parts.push(`<line x1="${px(a).toFixed(1)}" y1="${py(a).toFixed(1)}" x2="${px(b).toFixed(1)}" y2="${py(b).toFixed(1)}"
+      stroke="${on ? '#B45309' : col}" stroke-width="${w.toFixed(2)}" stroke-opacity="${op}"
+      ${zero ? 'stroke-dasharray="2 3"' : ''}/>`);
+  });
+
+  // Twenty-one node pairs sit within 16px of each other, so labelling all of
+  // them is unreadable. Label only what the current scenario touches, give
+  // everything else a hover title, and place the labels greedily around each
+  // node so they do not collide.
+  const placed = [], labels = [];
+  function place(cx, cy, txt, r) {
+    const w = txt.length * 6.2 + 4, h = 12;
+    const cands = [[cx + r + 5, cy + 3.5, 'start'], [cx - r - 5, cy + 3.5, 'end'],
+                   [cx, cy - r - 6, 'middle'], [cx, cy + r + 12, 'middle']];
+    for (const [x, y, anchor] of cands) {
+      const bx = anchor === 'start' ? x : anchor === 'end' ? x - w : x - w / 2;
+      const box = {x:bx, y:y - h + 3, w, h};
+      const hit = placed.some(p => !(box.x + box.w < p.x || p.x + p.w < box.x ||
+                                     box.y + box.h < p.y || p.y + p.h < box.y));
+      if (!hit) { placed.push(box); return {x, y, anchor}; }
+    }
+    return null;
+  }
+
+  const ordered = Object.values(NODES).sort((a, b) =>
+    (impact.get(a.id) || 0) - (impact.get(b.id) || 0));
+
+  ordered.forEach(n => {
+    const im = impact.get(n.id) || 0;
+    const isO = n.id === origin, isS = selected === n.id;
+    // Impacted nodes are solid ink, untouched are hollow. Filled against empty
+    // is a stronger distinction on paper than one shade of grey against another.
+    const r = isO ? 7 : (im > 0 ? 3.2 + im * 6.5 : 3.0);
+    const x = px(n), y = py(n);
+    const solid = isO || im > 0;
+    parts.push(`<g class="nd" data-n="${ID(n.id)}">
+      <title>${NAME(n.id)} — ${KIND(n.id).replace(/_/g,' ')}${im > 0 ? ', impact ' + im.toFixed(3) : ''}</title>
+      ${isO ? `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="12.5" fill="none" stroke="#1E293B" stroke-width="1" stroke-opacity=".4"/>` : ''}
+      <circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(1)}"
+        fill="${solid ? '#1E293B' : '#FFFFFF'}" fill-opacity="${solid ? (isO ? 1 : .45 + im * .55) : 1}"
+        stroke="${isS ? '#B45309' : (solid ? 'none' : '#94A3B8')}" stroke-width="${isS ? 2 : 1}"/>
+      <circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="11" fill="transparent"/>
+    </g>`);
+    if (im > 0 || isO || isS) {
+      const txt = esc(SHORT[n.id] || n.id);
+      const p = place(x, y, txt, r);
+      if (p) labels.push(`<text x="${p.x.toFixed(1)}" y="${p.y.toFixed(1)}" text-anchor="${p.anchor}"
+        font-size="10.5" fill="${isS ? '#B45309' : '#1E293B'}"
+        font-weight="${isO || isS ? 700 : 500}">${txt}</text>`);
+    }
+  });
+  parts.push(...labels);
+
+  const svg = document.getElementById('map');
+  svg.innerHTML = parts.join('');
+  svg.querySelectorAll('.nd').forEach(g => g.onclick = () => {
+    selected = (selected === g.dataset.n) ? null : g.dataset.n;
+    render();
+  });
+}
+
+function drawTrace(edges) {
+  const el = document.getElementById('trace');
+  if (!selected || selected === origin) { el.className = 'trace'; return; }
+  const paths = tracePaths(edges, origin, selected, opts());
+  const o = opts();
+  if (!paths.length) {
+    el.className = 'trace on';
+    el.innerHTML = `<h3>${NAME(selected)}</h3><div class="lead">No route from ${NAME(origin)} reaches this node above the floor under the current settings.</div>`;
+    return;
+  }
+  const sum = paths.reduce((a, p) => a + p.delivered, 0);
+  el.className = 'trace on';
+  el.innerHTML = `<h3>${NAME(selected)}</h3>
+    <div class="lead">Every route by which a shock at ${NAME(origin)} reaches it, and the arithmetic for each.</div>` +
+    paths.map(p => {
+      const chain = [SHORT[origin] || origin].concat(p.edges.map(e => SHORT[e.v] || e.v)).join(' → ');
+      const mult = p.edges.map(e =>
+        `${e.weight.toFixed(4)}<span class="bdg b-${e.basis[0]}">${e.basis[0] === 'E' ? 'MEAS' : 'ASSIGN'}</span>`).join(' &times; ');
+      return `<div class="pth"><div class="chain">${chain}</div>
+        <div class="arith">${mult} &times; <b>f(${p.hops})=${(p.delivered / p.raw).toFixed(4)}</b> = ${p.delivered.toFixed(4)}</div></div>`;
+    }).join('') +
+    `<div class="tot">${paths.length} route${paths.length > 1 ? 's' : ''}, summing to ${sum.toFixed(4)}${sum > 1 ? ', capped at 1.000' : ''}. Damping ${o.atten}, k = ${o.decay.toFixed(2)}.</div>`;
+}
+
+function drawOrigins() {
+  document.getElementById('origins').innerHTML = ORIGINS.map(([id, n, d]) =>
+    `<button class="orig ${id === origin ? 'on' : ''}" data-o="${esc(id)}">${esc(n)}<small>${esc(d)}</small></button>`).join('');
+  document.querySelectorAll('.orig').forEach(b => b.onclick = () => {
+    origin = b.dataset.o; selected = null; drawOrigins(); render();
+  });
+}
+
+function render() {
+  const o = opts();
+  const baseEdges = buildEdges(DATA, {}, measuredOnly);
+  const base = simulate(baseEdges, origin, o);
+  const baseRank = rank(base.impact, base.order, origin).map(r => r.node);
+
+  const edges = buildEdges(DATA, overrides, measuredOnly);
+  const cur = simulate(edges, origin, o);
+  const rows = rank(cur.impact, cur.order, origin);
+
+  document.getElementById('ctitle').textContent = '— ' + NAME(origin) + ', ' + KIND(origin);
+  const emp = document.getElementById('empty');
+  emp.style.display = rows.length ? 'none' : 'block';
+  emp.textContent = measuredOnly
+    ? 'Nothing propagates. With every analyst judgement silenced, the measured record alone does not carry a cascade from this node.'
+    : 'No downstream node reached above the floor.';
+
+  const max = rows.length ? rows[0].impact : 1;
+  const ORD = {1:'1st',2:'2nd',3:'3rd'};
+  document.getElementById('rows').innerHTML = rows.slice(0, 9).map((r, i) => {
+    const was = baseRank.indexOf(r.node);
+    let mv = '<span class="mv same">·</span>';
+    if (was >= 0 && was !== i) {
+      const d = was - i;
+      mv = `<span class="mv ${d > 0 ? 'up' : 'down'}">${d > 0 ? '▲' : '▼'}${Math.abs(d)}</span>`;
+    }
+    return `<tr class="row ${selected === r.node ? 'sel' : ''}" data-n="${ID(r.node)}">
+      <td class="node">${NAME(r.node)}</td>
+      <td class="kind">${KIND(r.node).replace(/_/g, ' ')}</td>
+      <td class="ord">${ORD[r.order] || r.order + 'th'}</td>
+      <td class="r val">${r.impact.toFixed(3)}</td>
+      <td><div class="barwrap"><div class="bar" style="width:${(r.impact / max * 100).toFixed(1)}%"></div></div></td>
+      <td class="r">${mv}</td></tr>`;
+  }).join('');
+  document.querySelectorAll('tr.row').forEach(tr => tr.onclick = () => {
+    selected = (selected === tr.dataset.n) ? null : tr.dataset.n; render();
+  });
+
+  const s = sensitivity(DATA, origin, o, measuredOnly);
+  const byId = {}; s.results.forEach(r => byId[r.aid] = r);
+  document.getElementById('assumps').innerHTML = DATA.assump.map(a => {
+    const d = byId[a.id] || {displacement:0};
+    const ov = overrides[a.id] != null ? overrides[a.id] : 1;
+    return `<div class="as ${ov !== 1 ? 'live' : ''}">
+      <div class="top"><span class="aid">${esc(a.id)}</span>
+        <span class="chip c-${esc(a.conf)}">${esc(a.conf)}</span>
+        <span class="disp ${d.displacement > 0 ? 'hot' : ''}">moves rank ${d.displacement}</span></div>
+      <p>${esc(a.statement)}</p>
+      <div class="wt"><span>${(ov * 100).toFixed(0)}%</span>
+        <input type="range" data-a="${esc(a.id)}" min="0.2" max="1.8" step="0.1" value="${ov}"></div>
+      <div class="fals"><b>Falsifier.</b> ${esc(a.falsifier)}</div></div>`;
+  }).join('');
+  document.querySelectorAll('.as input').forEach(inp => inp.oninput = () => {
+    const v = +inp.value;
+    if (Math.abs(v - 1) < 0.001) delete overrides[inp.dataset.a]; else overrides[inp.dataset.a] = v;
+    render();
+  });
+
+  let m = 0, a = 0, u = 0;
+  buildEdges(DATA).forEach(e => {
+    if (e.basis === 'EMPIRICAL' && e.weight === 0) u++;
+    else if (e.basis === 'EMPIRICAL') m++; else a++;
+  });
+  document.getElementById('pv-m').textContent = m;
+  document.getElementById('pv-a').textContent = a;
+  document.getElementById('pv-u').textContent = u;
+  document.getElementById('pv-n').textContent = Object.keys(NODES).length;
+  document.getElementById('ec').textContent = edges.size;
+  document.getElementById('nc').textContent = Object.keys(NODES).length;
+
+  drawMap(edges, cur.impact, cur.order);
+  drawTrace(edges);
+}
+
+document.getElementById('gaps').innerHTML = DATA.gaps.map(g =>
+  `<div class="gap"><b>${esc(g.subject)}</b><p>${esc(g.question)}</p>
+   <div class="src">Sought in: ${esc(g.sought_in)}</div></div>`).join('');
+
+const seen = new Set(), srcs = [];
+buildEdges(DATA).forEach(e => {
+  if (e.basis === 'EMPIRICAL' && e.weight > 0 && e.source && !seen.has(e.source)) {
+    seen.add(e.source); srcs.push(e.source);
+  }
+});
+document.getElementById('srcs').innerHTML =
+  srcs.map(s => `<div class="srcline"><b>Measured.</b> ${esc(s)}</div>`).join('') +
+  `<div class="srcline"><b>Analyst assigned.</b> Political friction and alliance strength cannot be measured.
+   These are declared rather than disguised, each referencing an assumption above with a recorded falsifier.</div>
+   <div class="srcline"><b>Unverified.</b> Defence budgets and field reserves are
+   order-of-magnitude reference points carrying verified = 0. None should be cited before checking against a source.
+   They are descriptive metadata and feed no output; the engine reads edge weights only.</div>
+   <div class="srcline" style="border:none;color:var(--dim)">Built 2026-08-16 from data/geopol_risk.db (4 measured, 20 assigned, 5 not yet measured).
+   Generated from the database by <span style="color:var(--mut)">src/build_viewer.py</span>. Never edited by hand,
+   so a stale copy announces itself above.</div>`;
+
+document.getElementById('reset').onclick = () => { overrides = {}; render(); };
+document.getElementById('k').oninput = e => {
+  document.getElementById('lab-k').textContent = (+e.target.value).toFixed(2); render();
+};
+document.getElementById('at').onchange = render;
+document.getElementById('mo').onclick = () => {
+  measuredOnly = !measuredOnly;
+  document.getElementById('mo').className = 'mo' + (measuredOnly ? ' on' : '');
+  render();
+};
+
+drawOrigins();
+render();
+</script>
+</body>
+</html>
