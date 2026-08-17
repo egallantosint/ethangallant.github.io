@@ -91,6 +91,18 @@ strong{font-weight:600}
                  margin-bottom:9px}
 .feature p{max-width:70ch}
 
+/* ---- keyboard focus --------------------------------------------------- */
+/* Visible focus for anyone navigating by keyboard. focus-visible rather than
+   focus, so it does not fire on mouse clicks. */
+a:focus-visible,button:focus-visible,[tabindex]:focus-visible{
+  outline:2px solid var(--accent);outline-offset:3px;border-radius:1px}
+
+/* Skip link: first thing a keyboard or screen reader user reaches, hidden
+   until focused, so the nav can be stepped over on every page. */
+.skip{position:absolute;left:-9999px;top:0;font-family:var(--sans);font-size:13px}
+.skip:focus{left:8px;top:8px;z-index:10;background:var(--card);color:var(--ink);
+            padding:8px 12px;border:1px solid var(--ink);text-decoration:none}
+
 /* ---- link affordance -------------------------------------------------- */
 /* A heading that is a link should say so without turning into a button.
    Slightly darker rule than body links, since headings carry more weight. */
